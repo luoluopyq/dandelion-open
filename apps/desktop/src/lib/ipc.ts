@@ -1165,21 +1165,10 @@ export function projectMemoryMetrics(): Promise<{ total: number; degraded: numbe
   return invoke('preflight_metrics', { limit: 200 });
 }
 
-// Account secrets stay in the Rust host; no token enters Vue/localStorage.
-// 后端对同一份授权做 TTL 缓存 + single-flight：启动期 App/TitleBar/监控循环
-// 背靠背查询只会打一次网络。force=true 供用户主动刷新绕过缓存。
-export const accountStatus=(force=false)=>invoke<import('./types').AccountStatus>('account_status',force?{force:true}:{});
-export const accountRegister=(email:string,name:string,password:string)=>invoke<void>('account_register',{email,name,password});
-export const accountLogin=(email:string,password:string)=>invoke<import('./types').AccountProfile>('account_login',{email,password});
-export const accountLogout=()=>invoke<void>('account_logout');
-export const accountPlans=()=>invoke<import('./types').AccountPlan[]>('account_plans');
-export const accountOrders=()=>invoke<import('./types').AccountOrder[]>('account_orders');
-export const accountCreateOrder=(plan:string)=>invoke<import('./types').AccountOrder>('account_create_order',{plan});
-export const accountUnbindDevice=(id:number)=>invoke<void>('account_unbind_device',{id});
-export const accountCheckUpdate=()=>invoke<import('./types').DesktopUpdate|null>('account_check_update');
-export const accountInstallUpdate=(expectedVersion:string)=>invoke<void>('account_install_update',{expectedVersion});
-
-export function accountConnection(serverUrl:string):Promise<void>{return invoke("account_connection",{serverUrl});}
+// Dandelion Open：无账号服务。更新检查走 GitHub Releases（Rust 侧做缓存与
+// 地址白名单），下载在系统浏览器中完成。force=true 跳过后端 15 分钟缓存。
+export const checkUpdate=(force=false)=>invoke<import('./types').UpdateInfo>('check_update',force?{force:true}:{});
+export const openDownload=()=>invoke<void>('open_download');
 
 export function wikiSuggestProjectName(draftId:string):Promise<string>{return invoke("wiki_suggest_project_name",{draftId});}
 

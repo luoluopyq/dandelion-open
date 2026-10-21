@@ -12,7 +12,7 @@
         <div class="menu-root"><button type="button" :class="{ active: menuOpen === 'file' }" @click="toggleMenu('file')">文件</button><section v-if="menuOpen === 'file'" class="desktop-menu"><button type="button" @click="fileNew"><span>新对话</span><kbd>{{ shortcut('Ctrl+N') }}</kbd></button><button type="button" @click="chooseWorkspace"><span>打开文件夹</span><kbd>{{ shortcut('Ctrl+O') }}</kbd></button><hr /><button type="button" :disabled="!session.sessionId" @click="fileClose"><span>关闭任务</span><kbd>{{ shortcut('Ctrl+W') }}</kbd></button><hr /><button type="button" @click="close"><span>退出蒲公英</span><kbd>{{ isMacOS ? '⌘Q' : 'Alt+F4' }}</kbd></button></section></div>
         <div class="menu-root"><button type="button" :class="{ active: menuOpen === 'edit' }" @click="toggleMenu('edit')">编辑</button><section v-if="menuOpen === 'edit'" class="desktop-menu"><button type="button" @click="runEdit('undo')"><span>撤销</span><kbd>{{ shortcut('Ctrl+Z') }}</kbd></button><button type="button" @click="runEdit('redo')"><span>重做</span><kbd>{{ shortcut('Ctrl+Y') }}</kbd></button><hr /><button type="button" @click="runEdit('cut')"><span>剪切</span><kbd>{{ shortcut('Ctrl+X') }}</kbd></button><button type="button" @click="runEdit('copy')"><span>复制</span><kbd>{{ shortcut('Ctrl+C') }}</kbd></button><button type="button" @click="runEdit('paste')"><span>粘贴</span><kbd>{{ shortcut('Ctrl+V') }}</kbd></button><button type="button" @click="runEdit('delete')"><span>删除</span></button><hr /><button type="button" @click="runEdit('selectAll')"><span>全选</span><kbd>{{ shortcut('Ctrl+A') }}</kbd></button><hr /><button type="button" @click="openSettings"><span>设置</span><kbd>{{ shortcut('Ctrl+,') }}</kbd></button></section></div>
         <div class="menu-root"><button type="button" :class="{ active: menuOpen === 'view' }" @click="toggleMenu('view')">视图</button><section v-if="menuOpen === 'view'" class="desktop-menu wide"><button type="button" @click="viewAction('sidebar')"><span>切换侧边栏</span><kbd>{{ shortcut('Ctrl+B') }}</kbd></button><button type="button" @click="viewAction('project')"><span>打开文件夹作为项目…</span></button><button type="button" @click="viewAction('explorer')"><span>打开资源管理器</span><kbd>{{ shortcut('Ctrl+P') }}</kbd></button><button type="button" @click="viewAction('review')"><span>打开审查面板</span><kbd>{{ shortcut('Ctrl+Shift+G') }}</kbd></button><button type="button" @click="viewAction('terminal')"><span>打开终端</span><kbd>{{ shortcut('Ctrl+`') }}</kbd></button><button type="button" @click="viewAction('browser')"><span>打开浏览器</span><kbd>{{ shortcut('Ctrl+T') }}</kbd></button><hr /><button type="button" @click="openPalette"><span>查找任务</span><kbd>{{ shortcut('Ctrl+F') }}</kbd></button><button type="button" :disabled="!canGoBack" @click="moveHistory(-1)"><span>上一个聊天</span><kbd>{{ shortcut('Ctrl+Shift+[') }}</kbd></button><button type="button" :disabled="!canGoForward" @click="moveHistory(1)"><span>下一个聊天</span><kbd>{{ shortcut('Ctrl+Shift+]') }}</kbd></button><hr /><button type="button" @click="toggleFullscreen"><span>切换全屏</span><kbd>{{ isMacOS ? shortcut('Ctrl+Meta+F') : 'F11' }}</kbd></button></section></div>
-        <div class="menu-root"><button type="button" :class="{ active: menuOpen === 'help' }" @click="toggleMenu('help')">帮助</button><section v-if="menuOpen === 'help'" class="desktop-menu"><button type="button" @click="helpPlaceholder('文档')"><span>文档</span></button><button type="button" @click="helpPlaceholder('键盘快捷键')"><span>显示键盘快捷键</span><kbd>{{ shortcut('Ctrl+/') }}</kbd></button><button type="button" @click="helpPlaceholder('新功能')"><span>新功能</span></button><hr /><button type="button" @click="helpPlaceholder('故障排除')"><span>故障排除</span></button><button type="button" @click="openSettings"><span>系统状态</span></button><button type="button" @click="helpPlaceholder('反馈')"><span>反馈</span></button><hr /><button type="button" @click="openAccount"><span>检查更新…</span></button><button type="button" @click="helpPlaceholder('关于蒲公英')"><span>关于蒲公英</span></button><p v-if="helpNotice" class="menu-notice">{{ helpNotice }}</p></section></div>
+        <div class="menu-root"><button type="button" :class="{ active: menuOpen === 'help' }" @click="toggleMenu('help')">帮助</button><section v-if="menuOpen === 'help'" class="desktop-menu"><button type="button" @click="helpPlaceholder('文档')"><span>文档</span></button><button type="button" @click="helpPlaceholder('键盘快捷键')"><span>显示键盘快捷键</span><kbd>{{ shortcut('Ctrl+/') }}</kbd></button><button type="button" @click="helpPlaceholder('新功能')"><span>新功能</span></button><hr /><button type="button" @click="helpPlaceholder('故障排除')"><span>故障排除</span></button><button type="button" @click="openSettings"><span>系统状态</span></button><button type="button" @click="helpPlaceholder('反馈')"><span>反馈</span></button><hr /><button type="button" @click="openUpdates"><span>检查更新…</span></button><button type="button" @click="helpPlaceholder('关于蒲公英')"><span>关于蒲公英</span></button><p v-if="helpNotice" class="menu-notice">{{ helpNotice }}</p></section></div>
       </nav>
       <!-- 这里原先有一个 250–410px 的「命令或搜索任务」长条。它调的 store.search
            与侧栏「搜索对话」是同一个函数、共用同一份 searchHits，功能重复且会互相
@@ -31,10 +31,6 @@
     <span v-if="!session.detached" class="spacer" data-tauri-drag-region />
     <span v-else class="task" data-tauri-drag-region :title="session.sessionId">{{ session.sessionTitle }}</span>
     <span v-if="session.detached" class="spacer" data-tauri-drag-region />
-    <button v-if="!session.detached" type="button" class="titlebar-account" :title="accountDisplayName ? '管理账号与更新' : '登录或注册蒲公英账号'" @click="openAccount">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5" /><path d="M5 21v-2a7 7 0 0 1 14 0v2" /></svg>
-      <span>{{ accountDisplayName || '登录 / 注册' }}</span>
-    </button>
     <!-- 搜索入口（设计稿右上角）。命令面板此前只有快捷键和菜单可进，这里补一个可见入口。 -->
     <button v-if="!session.detached" type="button" class="top-icon" :title="`搜索任务与命令（${shortcut('Ctrl+Shift+P')}）`" @click="openPalette">⌕</button>
     <button v-if="!session.detached" type="button" class="top-icon" :class="{ active: session.dockPanel === 'tasks' }" :title="`显示/隐藏任务栏（${shortcut('Ctrl+B')}）`" @click="session.toggleDock('tasks')">☰</button>
@@ -62,8 +58,6 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useSessionStore } from "../stores/session";
 import { theme, toggleTheme } from "../lib/theme";
 import { hasPrimaryModifier, isMacOS, shortcut } from "../lib/platform";
-import { accountDisplayName, accountStatusSnapshot, setAccountIdentity } from "../lib/account-state";
-import { accountStatus } from "../lib/ipc";
 
 const session = useSessionStore();
 const win = getCurrentWindow();
@@ -104,7 +98,7 @@ async function chooseWorkspace() { const folder = await session.selectFolder(); 
 async function fileNew() { closeMenus(); await session.newTask(); }
 async function fileClose() { const id = session.sessionId; closeMenus(); if (id) await session.closeTab(id); }
 async function openSettings() { closeMenus(); await session.openSettings("common"); }
-async function openAccount() { closeMenus(); await session.openSettings("account"); }
+async function openUpdates() { closeMenus(); await session.openSettings("updates"); }
 // 视图菜单这几项现在是「把工作区的某个工具叫出来」。它们只能让工作台切标签，
 // 不能再改主区——否则点「打开文件」会把正在进行的对话顶掉。
 function openWorkspaceTool(tool: "explorer" | "review" | "terminal" | "browser") { closeMenus(); window.dispatchEvent(new CustomEvent("dandelion:workspace-tool", { detail: tool })); }
@@ -132,16 +126,9 @@ function toggleMax() { void win.toggleMaximize(); }
 function onTitlebarDoubleClick(event: MouseEvent) { if (!usesNativeMacChrome && (event.target as HTMLElement | null)?.closest("[data-tauri-drag-region]")) toggleMax(); }
 function close() { if (session.detached) void win.destroy(); else void win.close(); }
 function onDocumentPointer(event: PointerEvent) { if (!(event.target as HTMLElement | null)?.closest(".menu-root")) closeMenus(); }
-// 账号身份是全局共享的：App 启动时已取过一次，TitleBar 只在快照还没有时补取，
-// 不再对同一份授权重复发请求（后端另有 TTL 缓存去重，这里是省掉整次 IPC）。
-onMounted(() => { window.addEventListener("keydown", onKeydown); document.addEventListener("pointerdown", onDocumentPointer); if (!session.detached && !accountStatusSnapshot.value) void accountStatus().then(setAccountIdentity).catch(() => {}); });
+onMounted(() => { window.addEventListener("keydown", onKeydown); document.addEventListener("pointerdown", onDocumentPointer); });
 onBeforeUnmount(() => { window.removeEventListener("keydown", onKeydown); document.removeEventListener("pointerdown", onDocumentPointer); window.clearTimeout(searchTimer); });
 </script>
 
 <style scoped>
-.titlebar-account{display:flex;align-items:center;gap:6px;max-width:180px;flex:0 0 auto;height:28px;padding:0 10px;border:1px solid var(--border);border-radius:7px;background:var(--bg-2);color:var(--text);font:inherit;font-size:12px;cursor:pointer;-webkit-app-region:no-drag}
-.titlebar-account:hover{background:var(--hover);border-color:var(--accent)}
-.titlebar-account:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.titlebar-account svg{width:15px;height:15px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round}
-.titlebar-account span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 </style>

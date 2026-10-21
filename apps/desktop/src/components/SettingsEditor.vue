@@ -38,8 +38,8 @@
           </header>
           <template v-if="group.id === 'common'">
             <div class="settings-overview-grid">
-              <button type="button" class="settings-overview-card" @click="store.openSettings('account')">
-                <span class="settings-overview-symbol">♙</span><strong>账号与更新</strong><small>登录或注册蒲公英账号，管理设备和软件更新。</small><span class="settings-overview-action">打开账号页面 ↗</span>
+              <button type="button" class="settings-overview-card" @click="store.openSettings('updates')">
+                <span class="settings-overview-symbol">↻</span><strong>关于与更新</strong><small>查看当前版本，检查 GitHub 上的新版本。</small><span class="settings-overview-action">打开更新页面 ↗</span>
               </button>
               <button type="button" class="settings-overview-card" @click="store.openSettings('models')">
                 <span class="settings-overview-symbol">◇</span><strong>模型</strong><small>{{ modelSummary }}</small><span class="settings-overview-action">选择或配置模型 ↗</span>
@@ -52,7 +52,7 @@
           </template>
           <template v-else>
           <button v-if="group.jump" type="button" class="settings-link-action" @click="onJump(group)">{{ group.jump.label }} →</button>
-          <AccountPanel v-if="group.id === 'account'" />
+          <UpdatesPanel v-if="group.id === 'updates'" />
           <SecurityPanel v-else-if="group.id === 'security'" />
           <template v-else-if="group.id === 'json'">
             <section class="settings-card"><textarea v-model="store.jsonDraft" class="json" rows="22" aria-label="settings.json 内容" @input="store.jsonDirty = true" />
@@ -120,7 +120,7 @@ import { computed, ref, watch } from "vue";
 import { useSessionStore } from "../stores/session";
 import { SETTINGS_GROUPS, type SettingsGroup } from "../lib/settings-catalog";
 import ModelManagerPanel from "./ModelManagerPanel.vue";
-import AccountPanel from "./AccountPanel.vue";
+import UpdatesPanel from "./UpdatesPanel.vue";
 import SecurityPanel from "./SecurityPanel.vue";
 import MemoryPanel from "./MemoryPanel.vue";
 import SpecPanel from "./SpecPanel.vue";
@@ -129,7 +129,7 @@ import ServePanel from "./ServePanel.vue";
 const store = useSessionStore();
 const advancedOpen = ref(false);
 const showDetails = ref(false);
-const PRIMARY_GROUP_IDS = new Set(["common", "providers", "models", "security", "account"]);
+const PRIMARY_GROUP_IDS = new Set(["common", "providers", "models", "security", "updates"]);
 const isPrimary = (id: string) => PRIMARY_GROUP_IDS.has(id);
 const query = computed({
   get: () => store.settingsQuery,
@@ -146,7 +146,7 @@ const matchingGroups = computed(() => {
   return SETTINGS_GROUPS.filter((g) => [g.title, g.hint, ...g.fields.flatMap((f) => [f.label, f.key, f.note])]
     .some((text) => text?.toLowerCase().includes(q)));
 });
-const primaryOrder = ["common", "models", "security", "account"];
+const primaryOrder = ["common", "models", "security", "updates"];
 const primaryGroups = computed(() => matchingGroups.value.filter((g) => isPrimary(g.id) && g.id !== "providers").sort((a, b) => primaryOrder.indexOf(a.id) - primaryOrder.indexOf(b.id)));
 const advancedGroups = computed(() => matchingGroups.value.filter((g) => !isPrimary(g.id) && g.id !== "providers"));
 const advancedSections = computed(() => [
@@ -237,7 +237,7 @@ function onJump(g: SettingsGroup) {
 }
 
 function iconFor(id: string) {
-  const icons: Record<string, string> = { common: "⌂", account: "♙", models: "◇", providers: "◇", security: "⊙", generation: "✳", loop: "↻", files: "▤", skills: "✦", mcp: "⌬", corpus: "▣", json: "{}" };
+  const icons: Record<string, string> = { common: "⌂", updates: "↻", models: "◇", providers: "◇", security: "⊙", generation: "✳", loop: "↻", files: "▤", skills: "✦", mcp: "⌬", corpus: "▣", json: "{}" };
   return icons[id] ?? "·";
 }
 </script>

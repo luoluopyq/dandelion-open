@@ -846,14 +846,8 @@ export interface KnowledgeDocumentPreview {
   enabled: boolean;
 }
 
-export interface AccountUser { id:string;email:string;name:string;role:string;status:string;plan:string;validUntil:string|null;createdAt:string }
-export interface AccountDevice {id:number;userId:string;installId:string;name:string;lastSeen:string}
-export interface AccountProfile {deviceWarning?:string;user:AccountUser;features:string[];maxDevices:number;devices:AccountDevice[]}
-export interface ApplicationAccess {allowed:boolean;code:string;message:string;validForMs:number}
-export interface AccountStatus {access:ApplicationAccess|null;configured:boolean;serverUrl:string;profile:AccountProfile|null;message:string|null;version:string;channel:string;updateKeyConfigured:boolean;canInstall:boolean;/** 断网宽限期：授权未被撤销、只是暂时无法复核，界面应保持可用 */grace:boolean}
-export interface AccountPlan {key:string;name:string;priceCents:number;days:number;maxDevices:number;features:string;enabled:boolean}
-export interface AccountOrder {id:string;userId:string;plan:string;amountCents:number;days:number;status:string;settlementId:string|null;createdAt:string}
-export interface DesktopUpdate {id:string;version:string;notes:string;pub_date:string;url:string;signature:string}
+/** Dandelion Open 更新检查：GitHub Releases 最新版本与本地版本比对结果。 */
+export interface UpdateInfo { current:string;latest:string;available:boolean;name:string;notes:string;url:string }
 
 /** Personal knowledge items share existing document/version identities. */
 export interface KnowledgeItem {

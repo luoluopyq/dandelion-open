@@ -21,7 +21,7 @@ export interface SettingsGroup {
 
 /** Labels only. Values always come from Runtime settings.json. */
 export const SETTINGS_GROUPS: SettingsGroup[] = [
-  {id: "account", title: "账号与更新", hint: "管理账号、设备、套餐和软件更新。", fields: []},
+  {id: "updates", title: "关于与更新", hint: "查看当前版本，检查并获取新版本。", fields: []},
   {
     id: "common",
     title: "概览",

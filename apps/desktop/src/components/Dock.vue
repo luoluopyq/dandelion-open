@@ -63,7 +63,7 @@ const items = computed<DockItem[]>(() => {
     //「空间列表」和「对话列表」两套口径同时存在。所以它并进了对话栏。
     { id: "spacer", label: "", paths: [], run: () => {} },
     { id: "rule", label: "", paths: [], run: () => {} },
-    { id: "account", label: "账号与更新", short: "账号", active: store.mainView === "settings" && store.settingsSection === "account", paths: ["M5 21v-2a7 7 0 0 1 14 0v2"], circle: { cx: 12, cy: 7, r: 4 }, run: () => void store.openSettings("account") },
+    { id: "updates", label: "关于与更新", short: "更新", active: store.mainView === "settings" && store.settingsSection === "updates", paths: ["M12 4v10", "m7 10 5 5 5-5", "M5 20h14"], run: () => void store.openSettings("updates") },
     { id: "models", label: "模型", short: "模型", paths: ["M12 3v2M12 19v2M21 12h-2M5 12H3M18.4 5.6 17 7M7 17l-1.4 1.4M18.4 18.4 17 17M7 7 5.6 5.6"], circle: { cx: 12, cy: 12, r: 3 }, run: () => void store.openSettings("models") },
   ] as DockItem[];
 });

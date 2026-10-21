@@ -1,6 +1,20 @@
-# Dandelion（蒲公英）
+# Dandelion Open（蒲公英 · 开源版）
 
-Dandelion 是本地优先的 AI Agent 桌面应用，同时提供命令行工具 `dln`。桌面端使用 Tauri 2、Vue 3；桌面端与 CLI 在进程内共用 Rust `dandelion-core` 的 Agent 运行时。模型可连接兼容 OpenAI API 的云端或本地服务。
+Dandelion Open 是本地优先的 AI Agent 桌面应用的**免登录开源版本**：启动直接进入主界面，无需注册、无需账号授权，所有功能立即可用。桌面端使用 Tauri 2、Vue 3；桌面端与 CLI 在进程内共用 Rust `dandelion-core` 的 Agent 运行时。模型可连接兼容 OpenAI API 的云端或本地服务。
+
+## 首次使用
+
+1. 从 [Releases](https://github.com/luoluopyq/dandelion-open/releases/latest) 下载安装包并安装，启动后直接进入主界面。
+2. 打开 **设置 → 模型**，填写你的模型服务：Base URL、API Key（本地服务可留空）与模型名，兼容任意 OpenAI 格式接口（含 Ollama、vLLM 等本地服务）。
+3. 回到主界面新建对话即可使用。除模型服务外没有其他联网依赖。
+
+**更新**：设置 → 关于与更新 可检查 GitHub Releases 上的新版本；有新版本时会引导到 Release 页面下载安装包。开源版不分发更新签名私钥，因此不做应用内自动更新。
+
+## 截图
+
+| 主界面（启动直达，无需登录） | 知识库 | 插件（外部 Agent 免授权） |
+| --- | --- | --- |
+| ![主界面](docs/screenshots/home.png) | ![知识库](docs/screenshots/knowledge.png) | ![插件](docs/screenshots/plugins.png) |
 
 ## 环境要求
 
@@ -52,7 +66,7 @@ npm --prefix apps/desktop ci
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-installer.ps1
 ```
 
-默认生成 NSIS 安装器：`target/release/bundle/nsis/Dandelion_<version>_x64-setup.exe`。也可以运行 `scripts/build-installer.cmd`；如需 MSI，给 PowerShell 脚本加 `-Bundler msi`。首次打包时，Tauri 可能下载 NSIS；MSI 另需 WiX。
+默认生成 NSIS 安装器：`target/release/bundle/nsis/Dandelion Open_<version>_x64-setup.exe`。也可以运行 `scripts/build-installer.cmd`；如需 MSI，给 PowerShell 脚本加 `-Bundler msi`。首次打包时，Tauri 可能下载 NSIS；MSI 另需 WiX。
 
 ## macOS 打包
 
@@ -64,12 +78,14 @@ npm --prefix apps/desktop ci
 bash scripts/build-installer.sh
 ```
 
-默认生成兼容 Apple silicon 与 Intel 的安装镜像：`target/universal-apple-darwin/release/bundle/dmg/Dandelion_<version>_universal.dmg`。只打单一架构时，使用 `bash scripts/build-installer.sh arm64` 或 `bash scripts/build-installer.sh x64`。脚本会安装缺失的 Rust target。未签名的本地构建首次打开时可能需要在 Finder 中右键选择“打开”。
+默认生成兼容 Apple silicon 与 Intel 的安装镜像：`target/universal-apple-darwin/release/bundle/dmg/Dandelion Open_<version>_universal.dmg`。只打单一架构时，使用 `bash scripts/build-installer.sh arm64` 或 `bash scripts/build-installer.sh x64`。脚本会安装缺失的 Rust target。未签名的本地构建首次打开时可能需要在 Finder 中右键选择“打开”。
 
 安装包必须在对应操作系统上构建；仓库的 `.github/workflows/release.yml` 可分别构建 Windows 和 macOS 产物。
 
-## 源码范围与许可
+## 许可
 
-本仓库发布 Dandelion 桌面端、`dandelion-core` 和 `dln` CLI 的源码。运营后台服务源码不在本仓库；桌面正式版需要连接独立部署的账号服务。
+本仓库（Dandelion Open）采用 [Apache License 2.0](LICENSE)，是真正的开源许可：可自由使用、修改和分发，包括商业用途。第三方依赖及素材遵循各自的许可。
 
-本仓库自本次公开版本起采用 [PolyForm Noncommercial License 1.0.0](LICENSE)。允许符合许可条款的非商业使用、修改和分发；商业用途需另行取得许可。第三方依赖及素材遵循各自的许可。本许可不是 OSI 认可的开源许可，因此本项目属于“源码公开”，不应标注为 OSI 开源项目。
+## 与商业版的区别
+
+Dandelion Open 不含登录、注册、授权、套餐与订单等账号功能，也不需要任何账号服务：所有能力在本地解锁，唯一的联网需求是你自行配置的模型服务，以及检查更新时访问 GitHub Releases。

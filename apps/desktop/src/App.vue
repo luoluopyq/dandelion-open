@@ -1,8 +1,7 @@
 <template>
   <n-config-provider :theme="naiveTheme" :theme-overrides="themeOverrides">
     <n-message-provider>
-      <AccountGate v-if="!applicationAccessGranted" />
-      <div v-else class="shell" :class="{ detached: session.detached }">
+      <div class="shell" :class="{ detached: session.detached }">
         <TitleBar />
         <div class="body">
           <template v-if="session.detached">
@@ -257,10 +256,6 @@
 <script setup lang="ts">
 import { darkTheme, lightTheme, NConfigProvider, NMessageProvider, NModal } from "naive-ui";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import AccountGate from './components/AccountGate.vue';
-import { applicationAccessGranted, accountStatusSnapshot, setAccountIdentity } from './lib/account-state';
-import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import type { AccountStatus } from './lib/types';
 import ChatPane from "./components/ChatPane.vue";
 import ConversationSidebar from "./components/ConversationSidebar.vue";
 import CronPanel from "./components/CronPanel.vue";
@@ -399,32 +394,9 @@ onMounted(() => {
   // batched IPC at t+5s, then boot's own flush still ships the rest.
   setTimeout(() => void ipc.flushBootMarks(), 5000);
   window.addEventListener("resize", onViewportResize);
-  void initializeAccess();
+  // Dandelion Open：无登录门禁，挂载即启动主界面。
+  void session.boot().catch(err=>{session.error=err instanceof Error?err.message:String(err);});
 });
-
-
-let bootedAfterAuthorization = false;
-let accessDisposed = false;
-const accessListeners:UnlistenFn[]=[];
-async function initializeAccess(){
-  try {
-    for (const [name, callback] of [
-      ['account-status',(event:{payload:AccountStatus})=>setAccountIdentity(event.payload)],
-      // access-denied 即明确失效：宽限标记必须一并清掉，否则门永远不会出现。
-      ['account-access-denied',()=>{if(accountStatusSnapshot.value)setAccountIdentity({...accountStatusSnapshot.value,access:null,grace:false});}],
-    ] as const) {
-      const off=await listen(name,callback as (event:any)=>void);
-      if(accessDisposed){off();return;}accessListeners.push(off);
-    }
-    const status=await ipc.accountStatus();if(!accessDisposed)setAccountIdentity(status);
-  } catch(err) {session.error=err instanceof Error?err.message:String(err);}
-}
-watch(applicationAccessGranted,allowed=>{
-  if(!allowed || bootedAfterAuthorization)return;
-  bootedAfterAuthorization=true;
-  void session.boot().catch(err=>{bootedAfterAuthorization=false;session.error=err instanceof Error?err.message:String(err);});
-});
-onBeforeUnmount(()=>{accessDisposed=true;accessListeners.forEach(off=>off());});
 
 // Work-order §二: knowledge-page visits (first and re-entry) get their own
 // mark + IPC ledger — the digest flushed at the boundary attributes those

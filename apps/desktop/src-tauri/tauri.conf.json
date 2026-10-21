@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Dandelion",
-  "version": "0.0.1",
-  "identifier": "com.dandelion.desktop",
+  "productName": "Dandelion Open",
+  "version": "0.1.0",
+  "identifier": "com.dandelion.open",
   "build": {
     "beforeDevCommand": {
       "cwd": "..",
@@ -20,7 +20,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "蒲公英",
+        "title": "蒲公英 · 开源版",
         "width": 1120,
         "height": 720,
         "minWidth": 900,
@@ -45,11 +45,5 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
-  },
-  "plugins": {
-    "updater": {
-      "pubkey": "",
-      "endpoints": []
-    }
   }
 }

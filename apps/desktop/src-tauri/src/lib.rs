@@ -1,6 +1,6 @@
 //! In-process Tauri host. Vue may only `invoke` the allowlisted commands below.
-mod accounts;
 mod knowledge_items;
+mod updates;
 
 use dandelion_core::acp::RequestPermissionOutcome;
 use dandelion_core::{
@@ -314,13 +314,11 @@ async fn session_new(state: State<'_, AppState>) -> Result<String, String> {
 #[tauri::command]
 async fn session_prompt(
     state: State<'_, AppState>,
-    account_host: State<'_, accounts::AccountHost>,
     session_id: String,
     text: String,
     mode: Option<String>,
     image_urls: Option<Vec<String>>,
 ) -> Result<String, String> {
-    let _prompt_guard = account_host.begin_prompt().await?;
     let rt = state.runtime.read().await.clone();
     let sid = SessionId::parse(session_id).map_err(map_err)?;
     let mut req = PromptRequest::new(sid, text);
@@ -3982,7 +3980,36 @@ fn boot_marks(marks: Vec<BootMark>) {
     }
 }
 
+/// Dandelion Open：与商业版**并行安装、数据隔离**。core 的
+/// `product_data_dir()` 优先读 `DANDELION_DATA_DIR`，这里在创建任何宿主之前
+/// 把它指到 Open 版自己的目录（用户显式设置了该变量时尊重用户）。
+fn ensure_isolated_data_dir() {
+    if std::env::var_os("DANDELION_DATA_DIR")
+        .is_some_and(|v| !v.to_string_lossy().trim().is_empty())
+    {
+        return;
+    }
+    #[cfg(windows)]
+    let isolated = std::env::var_os("APPDATA")
+        .map(|root| std::path::PathBuf::from(root).join("dandelion-open"));
+    #[cfg(target_os = "macos")]
+    let isolated = std::env::var_os("HOME")
+        .map(|home| std::path::PathBuf::from(home).join("Library/Application Support/dandelion-open"));
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let isolated = std::env::var_os("XDG_DATA_HOME")
+        .map(std::path::PathBuf::from)
+        .or_else(|| {
+            std::env::var_os("HOME")
+                .map(|home| std::path::PathBuf::from(home).join(".local/share"))
+        })
+        .map(|base| base.join("dandelion-open"));
+    if let Some(dir) = isolated {
+        std::env::set_var("DANDELION_DATA_DIR", dir);
+    }
+}
+
 pub fn run() {
+    ensure_isolated_data_dir();
     // Startup phase timing (work-order §二): per-phase info logs, on the same
     // wall clock as the core debug timings, so "which phase costs what" is
     // readable from one capture without mixing them into one number.
@@ -4003,14 +4030,8 @@ pub fn run() {
 
     let t = std::time::Instant::now();
     let host = Arc::new(DesktopHost::new_default());
-    let account_host = accounts::AccountHost::default();
-    let lease = account_host.lease.clone();
-    let grace = account_host.grace.clone();
-    host.set_execution_guard(Arc::new(move || {
-        // 断网宽限期内放行的仍是同一份授权（撤销会同时清零租约与宽限），
-        // 因此已授予过的工作可跨一次短暂断网继续，撤销后行为与 v0.0.1 一致。
-        if accounts::lease_valid(&lease) || accounts::grace_valid(&grace) {Ok(())} else {Err(dandelion_core::Error::NotConfigured("有效的应用使用授权".into()))}
-    }));
+    // Dandelion Open：无账号门禁——不设 execution guard（core 默认放行），
+    // 应用启动即可直接使用全部功能。
     let data_dir = host.data_dir();
     let _ = Settings::write_template_if_absent(&data_dir);
     tracing::info!(elapsed_ms = t.elapsed().as_millis() as u64, "startup: host + settings template");
@@ -4024,8 +4045,7 @@ pub fn run() {
 
     let t_build = std::time::Instant::now();
     tauri::Builder::default()
-        .plugin(tauri_plugin_updater::Builder::new().build())
-        .manage(account_host)
+        .manage(updates::Updates::default())
         .manage(AppState {
             host,
             runtime: RwLock::new(runtime),
@@ -4062,7 +4082,6 @@ pub fn run() {
                 );
                 let _ = emit.emit("permission-request", payload);
             }));
-            accounts::start_access_monitor(handle.clone());
             spawn_bus_forwarder(handle);
             if let Some(main) = app.get_webview_window("main") {
                 let settings = app
@@ -4116,10 +4135,7 @@ pub fn run() {
         })
         .invoke_handler({
             let handler: Arc<dyn Fn(tauri::ipc::Invoke) -> bool + Send + Sync> = Arc::new(tauri::generate_handler![
-            accounts::account_connection, accounts::account_status, accounts::account_register, accounts::account_login,
-            accounts::account_logout, accounts::account_plans, accounts::account_create_order,
-            accounts::account_orders, accounts::account_unbind_device,
-            accounts::account_check_update, accounts::account_install_update,
+            updates::check_update, updates::open_download,
             boot_marks,
             runtime_info,
             session_new,
@@ -4362,18 +4378,8 @@ pub fn run() {
             host_permission_respond,
             host_permission_pending,
             ]);
-            move |invoke: tauri::ipc::Invoke| {
-                if !accounts::needs_access(invoke.message.command()) {return handler(invoke);}
-                let app = invoke.message.webview().app_handle().clone();
-                let handler = handler.clone();
-                tauri::async_runtime::spawn(async move {
-                    match accounts::require_access(&app).await {
-                        Ok(()) => {let resolver=invoke.resolver.clone();if !handler(invoke) {resolver.reject("未知的桌面命令");}},
-                        Err(error) => invoke.resolver.reject(error),
-                    }
-                });
-                true
-            }
+            // Dandelion Open：不再包账号授权层，命令直达 handler。
+            move |invoke: tauri::ipc::Invoke| handler(invoke)
         })
         .build(tauri::generate_context!())
         .expect("error while building Dandelion desktop")

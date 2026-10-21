@@ -1,8 +1,10 @@
 name: release
 
-# Produces installers for every supported platform:
-#   windows-x64  -> Dandelion_<version>_x64-setup.exe   (NSIS, per-user install)
-#   macos-universal -> Dandelion_<version>_universal.dmg (Apple silicon + Intel)
+# Builds installers for every supported platform (artifacts only — the GitHub
+# Release itself is published manually so it can carry release notes and
+# screenshots):
+#   windows-x64  -> Dandelion Open_<version>_x64-setup.exe   (NSIS, per-user install)
+#   macos-universal -> Dandelion Open_<version>_universal.dmg (Apple silicon + Intel)
 #
 # Trigger: push a tag like v0.1.0, or run manually from the Actions tab.
 #
@@ -38,12 +40,6 @@ jobs:
         with:
           workspaces: ". -> target"
 
-      - name: Verify account service configuration
-        shell: bash
-        env:
-          OPERATIONS_URL: ${{ vars.DLN_OPERATIONS_URL }}
-        run: test -n "$OPERATIONS_URL" || { echo "Missing DLN_OPERATIONS_URL"; exit 1; }
-
       - name: Install frontend dependencies
         working-directory: apps/desktop
         run: npm ci
@@ -61,11 +57,6 @@ jobs:
 
       - name: Build NSIS installer
         working-directory: apps/desktop
-        env:
-          DLN_OPERATIONS_URL: ${{ vars.DLN_OPERATIONS_URL }}
-          DLN_UPDATE_PUBLIC_KEY: ${{ vars.DLN_UPDATE_PUBLIC_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run tauri build -- --bundles nsis --config src-tauri/tauri.bundle.conf.json --config src-tauri/tauri.release.generated.json
 
       - uses: actions/upload-artifact@v4
@@ -96,12 +87,6 @@ jobs:
         with:
           workspaces: ". -> target"
           key: macos-universal
-
-      - name: Verify account service configuration
-        shell: bash
-        env:
-          OPERATIONS_URL: ${{ vars.DLN_OPERATIONS_URL }}
-        run: test -n "$OPERATIONS_URL" || { echo "Missing DLN_OPERATIONS_URL"; exit 1; }
 
       - name: Install frontend dependencies
         working-directory: apps/desktop
@@ -136,8 +121,6 @@ jobs:
       - name: Build universal dmg
         working-directory: apps/desktop
         env:
-          DLN_OPERATIONS_URL: ${{ vars.DLN_OPERATIONS_URL }}
-          DLN_UPDATE_PUBLIC_KEY: ${{ vars.DLN_UPDATE_PUBLIC_KEY }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
@@ -155,18 +138,3 @@ jobs:
           if-no-files-found: error
           path: |
             target/universal-apple-darwin/release/bundle/dmg/*.dmg
-
-  release:
-    name: attach installers to release
-    needs: [windows, macos]
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          path: dist
-          merge-multiple: true
-      - uses: softprops/action-gh-release@v2
-        with:
-          files: dist/**/*
-          generate_release_notes: true
