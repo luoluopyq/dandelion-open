@@ -3,6 +3,7 @@ mod knowledge_items;
 mod updates;
 
 use dandelion_core::acp::RequestPermissionOutcome;
+use dandelion_core::secret::CredentialStore as _;
 use dandelion_core::{
     Authority, ChildListItem, ContextBuildRequest, ContextPack, ContextStatus, CorpusDoc,
     CronJobRow, CronRunRow, DesktopHost, EntityGraphProjection, HardwareProbe, KnowledgeAnswer,
@@ -1983,6 +1984,55 @@ async fn provider_probe(
 ) -> Result<ProviderProbe, String> {
     let rt = state.runtime.read().await.clone();
     rt.provider_probe(base_url, api_key).await.map_err(map_err)
+}
+
+// 每个已保存的服务地址（profile）各自持有自己的 API 密钥。密钥走 H3
+// CredentialStore（Windows 上 DPAPI 加密落盘），绝不进 settings.json ——
+// settings.json 里的 dandelion.provider.profiles 只存非敏感的连接信息。
+fn provider_key_secret_name(profile_id: &str) -> String {
+    format!("provider.{profile_id}")
+}
+
+#[tauri::command]
+async fn provider_key_put(
+    state: State<'_, AppState>,
+    profile_id: String,
+    api_key: String,
+) -> Result<(), String> {
+    dandelion_core::secret::FileCredentialStore::new(&state.host.data_dir())
+        .put(
+            &dandelion_core::secret::sanitize_secret_name(&provider_key_secret_name(&profile_id))
+                .map_err(map_err)?,
+            &api_key,
+        )
+        .map_err(map_err)
+}
+
+#[tauri::command]
+async fn provider_key_reveal(
+    state: State<'_, AppState>,
+    profile_id: String,
+) -> Result<Option<String>, String> {
+    dandelion_core::secret::FileCredentialStore::new(&state.host.data_dir())
+        .get(
+            &dandelion_core::secret::sanitize_secret_name(&provider_key_secret_name(&profile_id))
+                .map_err(map_err)?,
+        )
+        .map(|key| key.filter(|key| !key.trim().is_empty()))
+        .map_err(map_err)
+}
+
+#[tauri::command]
+async fn provider_key_forget(
+    state: State<'_, AppState>,
+    profile_id: String,
+) -> Result<(), String> {
+    dandelion_core::secret::FileCredentialStore::new(&state.host.data_dir())
+        .delete(
+            &dandelion_core::secret::sanitize_secret_name(&provider_key_secret_name(&profile_id))
+                .map_err(map_err)?,
+        )
+        .map_err(map_err)
 }
 
 #[tauri::command]
@@ -4233,6 +4283,9 @@ pub fn run() {
             settings_json,
             settings_put_json,
             provider_probe,
+            provider_key_put,
+            provider_key_reveal,
+            provider_key_forget,
             cron_list,
             cron_runs,
             cron_add,

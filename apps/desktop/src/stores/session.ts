@@ -17,6 +17,7 @@ import type {
   CorpusDoc,
   PermissionEvent,
   ProjectRow,
+  ProviderProfile,
   RuntimeInfo,
   SandboxRoots,
   SessionBindings,
@@ -45,6 +46,45 @@ function errText(err: unknown): string {
   if (err instanceof Error) return err.message;
   if (typeof err === "string") return err;
   return String(err);
+}
+
+// 已保存的模型服务连接（历史 API 地址）列表存放在 settings 的扩展键里：
+// core 对未知键原样保留（settings.extra），所以不需要新的后端命令就能持久化。
+// API 密钥不在这个列表里，按 profile id 各自存在 CredentialStore。
+export const PROVIDER_PROFILES_KEY = "dandelion.provider.profiles";
+export const SERVICE_BACKENDS = ["openai_compat", "openai_responses", "ollama", "vllm"];
+export const SERVICE_BACKEND_LABELS: Record<string, string> = {
+  openai_compat: "兼容 OpenAI 的 API",
+  openai_responses: "OpenAI Responses API",
+  ollama: "Ollama",
+  vllm: "vLLM",
+};
+
+export function providerBackendLabel(backend: string): string {
+  return SERVICE_BACKEND_LABELS[backend] ?? backend;
+}
+
+function parseProviderProfiles(values: Record<string, unknown>): ProviderProfile[] {
+  const raw = values[PROVIDER_PROFILES_KEY];
+  if (!Array.isArray(raw)) return [];
+  const out: ProviderProfile[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const p = item as Record<string, unknown>;
+    const id = String(p.id ?? "").trim();
+    const baseUrl = String(p.baseUrl ?? "").trim();
+    const model = String(p.model ?? "").trim();
+    if (!id || !baseUrl || !model) continue;
+    const backend = String(p.backend ?? "openai_compat");
+    out.push({
+      id,
+      name: String(p.name ?? "").trim() || model,
+      backend: SERVICE_BACKENDS.includes(backend) ? backend : "openai_compat",
+      baseUrl,
+      model,
+    });
+  }
+  return out;
 }
 
 // 左栏不再有「空间列表」这一格：工作空间不是一个与对话平级的导航页，而是对话
@@ -1473,6 +1513,8 @@ export const useSessionStore = defineStore("session", () => {
     ipc.bootMark("boot:surface", `surface=${current.surface}`);
     info.value = await ipc.runtimeInfo();
     settings.value = await ipc.settingsGet();
+    // 老单一服务地址 → profile 列表的一次性引导；异步补，不阻塞启动。
+    void ensureProviderProfilesSeeded().catch(() => undefined);
     await listenBus();
     ipc.bootMark("boot:runtime+settings+bus", ipc.ipcStatsDigest(6));
     if (current.surface === WINDOW_09_SURFACE && current.detachedId) {
@@ -2530,6 +2572,112 @@ export const useSessionStore = defineStore("session", () => {
     return ipc.providerProbe(baseUrl, apiKey);
   }
 
+  // —— 模型服务 profile：历史地址的增删改与切换（地址列表存 settings，密钥各自存 CredentialStore）——
+
+  const providerProfiles = computed(() => parseProviderProfiles(settings.value?.values ?? {}));
+
+  /** 当前新任务默认正在使用哪条已保存的服务连接（本机模型默认时为 null）。 */
+  const activeProviderProfile = computed(() => {
+    const values = settings.value?.values ?? {};
+    if (String(values["dandelion.defaultBackend"] ?? "") === "sidecar") return null;
+    const backend = String(values["dandelion.defaultBackend"] ?? "");
+    const model = String(values["dandelion.defaultModel"] ?? "").trim();
+    const baseUrl = String(values["dandelion.baseUrl"] ?? "").trim();
+    if (!model || !baseUrl) return null;
+    return providerProfiles.value.find(
+      (p) => p.backend === backend && p.model === model && p.baseUrl === baseUrl,
+    ) ?? null;
+  });
+
+  async function writeProviderProfiles(profiles: ProviderProfile[]) {
+    await patchSettings({ [PROVIDER_PROFILES_KEY]: profiles });
+  }
+
+  /** 新增或更新一条服务连接；历史列表只增改不隐式清空。 */
+  async function upsertProviderProfile(profile: ProviderProfile): Promise<boolean> {
+    panelError.value = null;
+    const list = [...providerProfiles.value];
+    const index = list.findIndex((p) => p.id === profile.id);
+    if (index >= 0) list[index] = profile;
+    else list.push(profile);
+    await writeProviderProfiles(list);
+    return !panelError.value;
+  }
+
+  async function removeProviderProfile(id: string): Promise<boolean> {
+    panelError.value = null;
+    await writeProviderProfiles(providerProfiles.value.filter((p) => p.id !== id));
+    if (panelError.value) return false;
+    try {
+      await ipc.providerKeyForget(id);
+    } catch {
+      // 地址已删，残留密钥不再被引用；不反删一次不阻塞删除操作。
+    }
+    return true;
+  }
+
+  /** 把新任务默认切到这条服务连接：热应用全局设置，并把它保存的密钥放进生效配置。 */
+  async function applyProviderProfile(id: string): Promise<boolean> {
+    panelError.value = null;
+    const profile = providerProfiles.value.find((p) => p.id === id);
+    if (!profile) return false;
+    let key: string | null = null;
+    try {
+      key = await ipc.providerKeyReveal(id);
+    } catch (err) {
+      panelError.value = errText(err);
+      return false;
+    }
+    await patchSettings({
+      "dandelion.defaultBackend": profile.backend,
+      "dandelion.defaultModel": profile.model,
+      "dandelion.baseUrl": profile.baseUrl,
+      "dandelion.service.backend": profile.backend,
+      "dandelion.service.model": profile.model,
+      "dandelion.apiKey": key?.trim() ? key.trim() : null,
+    });
+    return !panelError.value;
+  }
+
+  /** 把新任务默认切到某个本机模型；推理服务原本在跑时跟随重启生效。 */
+  async function switchToLocalModel(id: string): Promise<boolean> {
+    panelError.value = null;
+    const model = localModels.value.find((m) => m.id === id);
+    if (!model) return false;
+    const wasActive = !!model.active;
+    const wasRunning = sidecar.value?.kind === "ready";
+    if (!wasActive) {
+      await activateModel(id);
+      if (panelError.value) return false;
+    }
+    await patchSettings({ "dandelion.defaultBackend": "sidecar", "dandelion.defaultModel": id });
+    if (!wasActive && wasRunning && !panelError.value) await startSidecar();
+    return !panelError.value;
+  }
+
+  /** 老版本只有一个服务地址：首次进入时把它登记为 profile，历史配置不丢。 */
+  async function ensureProviderProfilesSeeded() {
+    const values = settings.value?.values ?? {};
+    if (providerProfiles.value.length) return;
+    const baseUrl = String(values["dandelion.baseUrl"] ?? "").trim();
+    const defaultBackend = String(values["dandelion.defaultBackend"] ?? "openai_compat");
+    const model = String(values["dandelion.service.model"] ?? (defaultBackend === "sidecar" ? "" : values["dandelion.defaultModel"] ?? "")).trim();
+    if (!baseUrl || !model) return;
+    const backendRaw = String(values["dandelion.service.backend"] ?? (defaultBackend === "sidecar" ? "" : defaultBackend));
+    if (!SERVICE_BACKENDS.includes(backendRaw)) return;
+    const profile: ProviderProfile = { id: "default", name: model, backend: backendRaw, baseUrl, model };
+    await writeProviderProfiles([profile]);
+    if (panelError.value) return;
+    if (settings.value?.apiKeySet) {
+      try {
+        const key = await ipc.settingsApiKeyReveal();
+        if (key) await ipc.providerKeyPut(profile.id, key);
+      } catch {
+        // 旧密钥没能复制过来时，用户在编辑里重填一次即可；不阻塞引导。
+      }
+    }
+  }
+
   async function openContextBadge() {
     await refreshContext();
     contextOpen.value = true;
@@ -3225,6 +3373,13 @@ export const useSessionStore = defineStore("session", () => {
     saveSettingsJson,
     loadSettingsJson,
     probeProvider,
+    providerProfiles,
+    activeProviderProfile,
+    upsertProviderProfile,
+    removeProviderProfile,
+    applyProviderProfile,
+    switchToLocalModel,
+    ensureProviderProfilesSeeded,
     openContextBadge,
     refreshContext,
     importSkill,

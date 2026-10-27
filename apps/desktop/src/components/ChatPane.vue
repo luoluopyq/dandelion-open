@@ -178,7 +178,19 @@
             </div>
             <div class="composer-right">
               <button v-if="!session.running && !session.queued && !refineSource" type="button" class="composer-refine" :disabled="!draft.trim() || refining || (!!session.active && !session.canSend) || session.readOnly" title="用当前模型整理任务，结果直接填入输入框" @click="refineTask">{{ refining ? "整理中…" : "✦ 整理任务" }}</button>
-              <button type="button" class="composer-model" :title="`切换模型：${composerModel}`" @click="session.openSettings('models')"><span class="composer-model-name">{{ composerModel }}</span><span class="composer-model-caret" aria-hidden="true">⌄</span></button>
+              <div class="composer-menu-root composer-model-menu-root" data-composer-menu="model">
+                <button type="button" class="composer-model" :title="session.running || session.queued ? '任务运行中，结束后可切换模型' : `切换模型：${composerModel}`" :disabled="session.readOnly || session.running || session.queued" @click="toggleModelMenu"><span class="composer-model-name">{{ composerModel }}</span><span class="composer-model-caret" aria-hidden="true">⌄</span></button>
+                <div v-if="modelOpen" class="composer-menu mode-menu">
+                  <p class="composer-menu-title">模型服务</p>
+                  <p v-if="session.panelError" role="alert">{{ session.panelError }}</p>
+                  <p v-if="!session.providerProfiles.length" class="composer-menu-title">尚未保存服务地址。</p>
+                  <button v-for="p in session.providerProfiles" :key="p.id" type="button" :class="{ selected: p.id === session.activeProviderProfile?.id }" :disabled="switchingModel" @click="chooseProfile(p.id)"><b>{{ p.id === session.activeProviderProfile?.id ? '✓ ' : '' }}{{ p.name }}</b><small>{{ backendKind(p.backend) }} · {{ p.baseUrl }}</small></button>
+                  <p class="composer-menu-title">本机模型</p>
+                  <p v-if="!session.localModels.length" class="composer-menu-title">本机还没有导入模型。</p>
+                  <button v-for="m in session.localModels" :key="m.id" type="button" :class="{ selected: isLocalDefault(m.id) }" :disabled="switchingModel" @click="chooseLocalModel(m.id)"><b>{{ isLocalDefault(m.id) ? '✓ ' : '' }}{{ m.name }}</b><small>{{ m.format.toUpperCase() }} · {{ m.quant }}</small></button>
+                  <button type="button" @click="modelOpen = false; session.openSettings('models')"><b>管理模型</b></button>
+                </div>
+              </div>
               <button v-if="session.running || session.stopping || session.queued" type="button" class="composer-send stop" :disabled="session.stopping" title="停止生成" @click="session.stop()">■</button>
               <button v-else type="submit" class="composer-send" :disabled="(!!session.active && !session.canSend) || (!draft.trim() && !attachments.length) || session.readOnly" :title="refineSource ? '发送整理后的任务' : '发送'" :aria-label="refineSource ? '发送整理后的任务' : '发送'"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m0 0-6 6m6-6 6 6" /></svg></button>
             </div>
@@ -202,7 +214,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { useSessionStore } from "../stores/session";
+import { providerBackendLabel, useSessionStore } from "../stores/session";
 import { agentEngineVision, fileImageDataUrl, filePick, promptRefine } from "../lib/ipc";
 import { groupKey, groupMessages } from "../lib/group-messages";
 import MessageBubble from "./MessageBubble.vue";
@@ -324,6 +336,38 @@ const composerModel = computed(() => {
   return model || "选择模型";
 });
 
+// 输入栏里直接选已配置好的模型：服务地址列表（含历史保存的 API）+ 本机模型。
+// 切换即热应用全局默认，只影响之后的任务；运行中禁用，不动正在流的连接。
+const modelOpen = ref(false);
+const switchingModel = ref(false);
+function backendKind(backend: string) { return providerBackendLabel(backend); }
+function isLocalDefault(id: string) {
+  const values = session.settings?.values ?? {};
+  return values["dandelion.defaultBackend"] === "sidecar" && String(values["dandelion.defaultModel"] ?? "") === id;
+}
+function toggleModelMenu() {
+  modelOpen.value = !modelOpen.value;
+  if (modelOpen.value) {
+    // 老单地址配置可能还没进列表（比如首次引导刚保存）；打开时补一次引导。
+    void session.ensureProviderProfilesSeeded().catch(() => undefined);
+    void session.refreshSidecar().catch(() => undefined);
+  }
+}
+async function chooseProfile(id: string) {
+  if (switchingModel.value || session.running || session.queued) return;
+  switchingModel.value = true;
+  const ok = await session.applyProviderProfile(id);
+  switchingModel.value = false;
+  if (ok) modelOpen.value = false;
+}
+async function chooseLocalModel(id: string) {
+  if (switchingModel.value || session.running || session.queued) return;
+  switchingModel.value = true;
+  const ok = await session.switchToLocalModel(id);
+  switchingModel.value = false;
+  if (ok) modelOpen.value = false;
+}
+
 // 只读现在只剩子代理一种（cron 已放开为可写）。
 // 光说「发给父会话」没用 —— 得让人知道父是哪一条、并且能直接跳过去。
 const parentRow = computed(() => {
@@ -437,6 +481,7 @@ watch(() => session.sessionId, (_newId, oldId) => {
   modeOpen.value = false;
   agentOpen.value = false;
   skillOpen.value = false;
+  modelOpen.value = false;
 }, { immediate: true });
 watch(externalAgent, (active) => { if (active) mode.value = "auto"; });
 
@@ -518,14 +563,16 @@ function onDocumentPointer(event: PointerEvent) {
   if (which !== "agent") agentOpen.value = false;
   if (which !== "skill") skillOpen.value = false;
   if (which !== "perm") permOpen.value = false;
+  if (which !== "model") modelOpen.value = false;
 }
 function onDocumentEscape(event: KeyboardEvent) {
-  if (event.key !== "Escape" || (!attachOpen.value && !modeOpen.value && !agentOpen.value && !skillOpen.value && !permOpen.value)) return;
+  if (event.key !== "Escape" || (!attachOpen.value && !modeOpen.value && !agentOpen.value && !skillOpen.value && !permOpen.value && !modelOpen.value)) return;
   attachOpen.value = false;
   modeOpen.value = false;
   agentOpen.value = false;
   skillOpen.value = false;
   permOpen.value = false;
+  modelOpen.value = false;
 }
 onMounted(() => {
   // ChatPane 在设置/记忆等页面切走时被卸载、切回时重新挂载。重新挂载时
@@ -695,3 +742,8 @@ async function onSend() {
   autoResize();
 }
 </script>
+
+<style scoped>
+/* 模型菜单贴着输入栏右缘，向左展开，避免窄窗口时越过窗口右边界。 */
+.composer-model-menu-root .composer-menu { left: auto; right: 0; }
+</style>

@@ -551,6 +551,17 @@ export interface ProviderProbe {
   models: string[];
 }
 
+/** 一条已保存的模型服务连接（历史 API 地址）。存于 settings 的
+ * dandelion.provider.profiles；API 密钥本体走 CredentialStore，绝不入 settings.json。 */
+export interface ProviderProfile {
+  id: string;
+  name: string;
+  /** openai_compat | openai_responses | ollama | vllm */
+  backend: string;
+  baseUrl: string;
+  model: string;
+}
+
 export interface PermissionEvent {
   requestId: string;
   sessionId: string;

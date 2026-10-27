@@ -837,6 +837,20 @@ export function providerProbe(
   });
 }
 
+/** 保存某条服务配置（profile）自己的 API 密钥（加密存于数据目录，不进 settings.json）。 */
+export function providerKeyPut(profileId: string, apiKey: string): Promise<void> {
+  return invoke("provider_key_put", { profileId, apiKey });
+}
+
+/** 读出某条服务配置保存的 API 密钥，供“显示/隐藏”与切换时热应用。 */
+export function providerKeyReveal(profileId: string): Promise<string | null> {
+  return invoke("provider_key_reveal", { profileId });
+}
+
+export function providerKeyForget(profileId: string): Promise<void> {
+  return invoke("provider_key_forget", { profileId });
+}
+
 export function cronList(): Promise<import("./types").CronJobRow[]> {
   return invoke("cron_list");
 }
