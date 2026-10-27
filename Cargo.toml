@@ -3,7 +3,7 @@ resolver = "2"
 members = ["crates/dandelion-core", "crates/dandelion-cli", "apps/desktop/src-tauri"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "Apache-2.0"
 repository = "https://github.com/luoluopyq/dandelion-open"
@@ -12,7 +12,7 @@ authors = ["Dandelion"]
 description = "Local-first desktop AI agent (core + CLI; Tauri hosts the same core)"
 
 [workspace.dependencies]
-dandelion-core = { path = "crates/dandelion-core", version = "0.1.0" }
+dandelion-core = { path = "crates/dandelion-core", version = "0.2.0" }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "sync", "time", "process", "io-util", "fs"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
