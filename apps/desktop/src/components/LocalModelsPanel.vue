@@ -16,6 +16,7 @@
     <section class="local-model-library">
       <div class="local-model-heading"><div><h2>本机模型</h2><p>已导入 {{ store.localModels.length }} 个模型。选择后可在此电脑启动。</p></div><button type="button" class="button-quiet" :aria-expanded="showImport" @click="showImport = !showImport">{{ showImport ? '收起添加方式' : '添加模型' }}</button></div>
       <div v-if="showImport" class="local-model-import-choices"><button type="button" class="button-quiet" @click="store.importGguf()">选择 GGUF 文件</button><button v-if="isMac" type="button" class="button-quiet" @click="store.importMlx()">选择 MLX 文件夹</button><button v-if="isMac" type="button" class="button-quiet" :aria-expanded="showPathImport" @click="showPathImport = !showPathImport">{{ showPathImport ? '收起路径输入' : '粘贴文件夹路径' }}</button><button type="button" class="button-quiet" :aria-expanded="showDownload" @click="showDownload = !showDownload">{{ showDownload ? '收起魔搭下载' : '从魔搭下载 GGUF' }}</button></div>
+      <small v-if="showImport && isMac">MLX 选择窗口会显示 .lmstudio、.cache 等隐藏目录。也可粘贴模型文件夹的完整路径；请选择包含 config.json 和模型权重的文件夹。</small>
       <form v-if="showImport && isMac && showPathImport" class="local-model-download" @submit.prevent="onImportPath">
         <label for="mlx-folder-path">MLX 模型文件夹的完整路径<input id="mlx-folder-path" v-model.trim="mlxFolderPath" type="text" placeholder="/Users/用户名/.lmstudio/models/模型文件夹" autocomplete="off" spellcheck="false" required /></label>
         <small>选择窗口找不到以 . 开头的隐藏目录时，可在这里粘贴模型文件夹路径。文件夹需包含 config.json 和模型权重。</small>

@@ -8374,8 +8374,17 @@ impl Runtime {
         }
         let venv = data_dir.join("bin").join("mlx-venv");
         std::fs::create_dir_all(venv.parent().expect("venv parent"))?;
-        let create = tokio::process::Command::new("python3")
-            .args(["-m", "venv"])
+        let base_python = crate::mlx_install::find_python().await?;
+        let python = venv.join("bin").join("python3");
+        let mut create_command = tokio::process::Command::new(&base_python);
+        create_command.args(["-m", "venv"]);
+        // Only replace an incompatible environment owned by this installer.
+        if venv.join("pyvenv.cfg").is_file()
+            && !crate::mlx_install::python_is_supported(&python).await
+        {
+            create_command.arg("--clear");
+        }
+        let create = create_command
             .arg(&venv)
             .output()
             .await
@@ -8386,7 +8395,8 @@ impl Runtime {
                 String::from_utf8_lossy(&create.stderr)
             )));
         }
-        let python = venv.join("bin").join("python3");
+        // venv bootstraps pip from the selected supported Python. Do not make
+        // installation depend on a separate online pip upgrade.
         let install = tokio::process::Command::new(&python)
             .args(["-m", "pip", "install", "mlx-lm==0.32.0"])
             .output()

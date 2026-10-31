@@ -22,6 +22,7 @@ pub mod ids;
 pub mod jobs;
 pub mod mcp;
 pub mod memory;
+mod mlx_install;
 pub mod permission;
 pub mod preflight;
 pub mod provider;

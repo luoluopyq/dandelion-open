@@ -1,5 +1,6 @@
 //! In-process Tauri host. Vue may only `invoke` the allowlisted commands below.
 mod knowledge_items;
+mod model_import;
 mod updates;
 
 use dandelion_core::acp::RequestPermissionOutcome;
@@ -3435,11 +3436,10 @@ async fn local_model_import_pick(state: State<'_, AppState>) -> Result<Option<Lo
 
 #[tauri::command]
 async fn local_model_import_mlx_pick(
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<Option<LocalModel>, String> {
-    let picked = tokio::task::spawn_blocking(|| rfd::FileDialog::new().pick_folder())
-        .await
-        .map_err(|e| e.to_string())?;
+    let picked = model_import::pick_mlx_folder(&app).await?;
     let Some(path) = picked else {
         return Ok(None);
     };
