@@ -122,7 +122,7 @@
           <div v-if="!hideAsk && askOpen" class="wiki-ask">
             <div class="wiki-input-row"><input id="wiki-question" v-model="question" aria-label="向项目 Wiki 提问" placeholder="例如：这个项目主要在做什么？" :disabled="!!busy" @keydown.enter="ask" /><button type="button" class="button-primary" :disabled="!!busy || !question.trim()" @click="ask">{{ busy === "ask" ? "正在查找…" : "提问" }}</button></div>
             <div v-if="answer" class="wiki-answer" aria-live="polite">
-              <div class="wiki-answer-text" v-html="linkifyCitations(renderMarkdown(answer.answer))" @click="onBodyClick"></div>
+              <div class="wiki-answer-text" v-html="linkifyCitations(renderMarkdown(answer.answer))" @click="onBodyClick" @auxclick="onBodyClick"></div>
               <details v-if="answer.sources.length"><summary>查看依据（{{ answer.sources.length }}，原始源码证据优先）</summary><ol><li v-for="(source, i) in answer.sources" :key="i"><button class="wiki-source-link" type="button" @click="openEvidence(evidenceTarget(source))">{{ source.kind === "raw" ? `${source.page}:L${source.start ?? "?"}${source.end && source.end !== source.start ? `-L${source.end}` : ""}` : source.page }}</button>：{{ source.excerpt }}<span v-if="source.stale" class="wiki-stale" title="依据文件已变化，本页待重建">可能过期</span></li></ol></details>
             </div>
           </div>
@@ -130,7 +130,7 @@
             {{ pendingCount }} 条知识待审核，通过后才会进入页面。
             <button type="button" class="wiki-domain-switch" @click="manageOpen = true">去审核</button>
           </div>
-          <div v-if="body" class="wiki-article-body" v-html="linkifyCitations(renderMarkdown(body))" @click="onBodyClick"></div>
+          <div v-if="body" class="wiki-article-body" v-html="linkifyCitations(renderMarkdown(body))" @click="onBodyClick" @auxclick="onBodyClick"></div>
           <p v-else-if="page" class="wiki-notice">这个页面暂时没有内容。</p>
           </article>
 
@@ -207,6 +207,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { WikiAnswer, WikiEntry, WikiPageEntry, WikiProfile, WikiSourceWindow } from "../lib/types";
 import * as ipc from "../lib/ipc";
 import { renderMarkdown } from "../lib/markdown";
+import { relativeWikiPage } from "../lib/links";
 import { citationTarget, evidenceTarget, joinWorkspacePath, linkifyCitations, type EvidenceTarget } from "../lib/wiki-evidence";
 import { createWikiGate } from "../lib/wiki-identity";
 import { buildFailureNotice, groupPages, pageProvenanceHint, readState as computeReadState, resolveSelectedPage, samePath } from "../lib/wiki-view";
@@ -556,14 +557,15 @@ async function openSource(source: string) {
 // 正文/答案的委托点击：站内文章链接（概览的学习顺序等）页内切页 +
 // 代码块复制按钮 + `路径:Lx-Ly` 引用跳源码证据。
 function onBodyClick(event: MouseEvent) {
+  if (event.type === "auxclick" && event.button !== 1) return;
   // 文章正文里的相对 .md 链接指向本 Wiki 的页面（marked 渲染出的 <a>），
-  // 不拦会让 webview 直接导航离开；外部链接仍交给 webview 默认行为。
+  // 不拦会让 webview 直接导航离开；其余链接由应用统一处理。
   const link = (event.target as HTMLElement).closest("a") as HTMLAnchorElement | null;
   if (link) {
-    const href = link.getAttribute("href") ?? "";
-    if (/\.md(\?|#|$)/i.test(href) && !/^(?:https?:|mailto:|data:)/i.test(href)) {
+    const page = relativeWikiPage(link.getAttribute("href") ?? "");
+    if (page) {
       event.preventDefault();
-      void openSource(href.split(/[?#]/)[0] ?? href);
+      void openSource(page);
     }
     return;
   }

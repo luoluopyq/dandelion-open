@@ -4185,7 +4185,7 @@ pub fn run() {
         })
         .invoke_handler({
             let handler: Arc<dyn Fn(tauri::ipc::Invoke) -> bool + Send + Sync> = Arc::new(tauri::generate_handler![
-            updates::check_update, updates::open_download,
+            updates::check_update, updates::open_download, updates::open_external_url,
             boot_marks,
             runtime_info,
             session_new,

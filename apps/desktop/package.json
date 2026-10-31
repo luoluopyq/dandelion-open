@@ -1,7 +1,7 @@
 {
   "name": "dandelion-desktop",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "typecheck": "vue-tsc --noEmit",
-    "test": "tsc src/lib/knowledge-items.ts src/lib/memory-view.ts src/lib/knowledge-citations.ts src/lib/wiki-view.ts src/lib/wiki-evidence.ts src/lib/wiki-identity.ts src/lib/space-gate.ts --outDir node_modules/.wiki-view-test --target es2022 --module es2022 --strict --skipLibCheck && node --test tests/*.test.mjs"
+    "test": "tsc src/lib/links.ts src/lib/knowledge-items.ts src/lib/memory-view.ts src/lib/knowledge-citations.ts src/lib/wiki-view.ts src/lib/wiki-evidence.ts src/lib/wiki-identity.ts src/lib/space-gate.ts --outDir node_modules/.wiki-view-test --target es2022 --module es2022 --strict --skipLibCheck && node --test tests/*.test.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "2.12.4",

@@ -3,6 +3,7 @@
     <n-message-provider>
       <div class="shell" :class="{ detached: session.detached }">
         <TitleBar />
+        <KnowledgeSourceDialog :locator="linkLocator" @close="linkLocator = null" />
         <div class="body">
           <template v-if="session.detached">
             <main class="main">
@@ -272,6 +273,9 @@ import SetupForm from "./components/SetupForm.vue";
 import SkillPanel from "./components/SkillPanel.vue";
 import MemoryManagerPanel from "./components/MemoryManagerPanel.vue";
 import KnowledgeHubPanel from "./components/KnowledgeHubPanel.vue";
+import KnowledgeSourceDialog from "./components/KnowledgeSourceDialog.vue";
+import type { SourceLocator } from "./lib/knowledge-citations";
+import { handleAppLink } from "./lib/links";
 import FeatureNavigation from "./components/FeatureNavigation.vue";
 import CorpusManagerPanel from "./components/CorpusManagerPanel.vue";
 import StatusBar from "./components/StatusBar.vue";
@@ -284,6 +288,19 @@ import * as ipc from "./lib/ipc";
 import { theme } from "./lib/theme";
 
 const session = useSessionStore();
+const linkLocator = ref<SourceLocator | null>(null);
+function onAppLink(event: MouseEvent) {
+  handleAppLink(event, {
+    knowledge: locator => { linkLocator.value = locator; },
+    page: page => {
+      const inChat = event.target instanceof Element && event.target.closest(".bubble.assistant");
+      if (inChat && session.selectedFolder) linkLocator.value = { workspace: session.selectedFolder, page };
+      else session.notice = "此文章链接缺少所属知识库，请从知识页面打开。";
+    },
+    external: ipc.openExternalUrl,
+    notice: message => { session.notice = message; },
+  });
+}
 const permissionTaskTitle = computed(() => {
   const id = session.permission?.sessionId;
   if (!id) return "当前任务";
@@ -385,6 +402,8 @@ function onViewportResize() {
 }
 
 onMounted(() => {
+  document.addEventListener("click", onAppLink);
+  document.addEventListener("auxclick", onAppLink);
   // Work-order §二: first-paint mark. performance.now() base is webview
   // navigation start, so "app:first-paint" minus the backend "setup entered"
   // phase is the webview-side gap, kept separate from process/window numbers.
@@ -417,6 +436,8 @@ watch(
 );
 
 onBeforeUnmount(() => {
+  document.removeEventListener("click", onAppLink);
+  document.removeEventListener("auxclick", onAppLink);
   window.removeEventListener("resize", onViewportResize);
 });
 </script>

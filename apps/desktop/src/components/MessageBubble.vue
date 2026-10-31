@@ -48,7 +48,6 @@
       </div>
       <pre class="plain">{{ msg.text }}</pre>
     </template>
-    <KnowledgeSourceDialog :locator="knowledgeLocator" @close="knowledgeLocator = null" />
     <Teleport to="body">
       <div v-if="lightbox" class="image-lightbox" role="dialog" aria-label="图片预览" @click="lightbox = ''">
         <img :src="lightbox" alt="图片预览" @click.stop />
@@ -60,8 +59,6 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import KnowledgeSourceDialog from "./KnowledgeSourceDialog.vue";
-import { parseKnowledgeCitation, type KnowledgeLocator } from "../lib/knowledge-citations";
 import { renderMarkdown } from "../lib/markdown";
 import { outputRate } from "../lib/output-rate";
 import type { ChatMessage } from "../lib/types";
@@ -78,7 +75,6 @@ const props = defineProps<{ msg: ChatMessage }>();
 const emit = defineEmits<{ retry: [text: string] }>();
 const store = useSessionStore();
 const copied = ref(false);
-const knowledgeLocator = ref<KnowledgeLocator | null>(null);
 const lightbox = ref("");
 
 // 用户消息图片：imagePaths 是应用数据目录里的持久化路径，渲染时按需换回
@@ -188,12 +184,6 @@ function parseTodo(msg: ChatMessage): TodoRow[] | null {
 }
 
 function onCopy(ev: MouseEvent) {
-  const link = (ev.target as HTMLElement).closest('a[href^="#knowledge/"], a[href^="#knowledge-page/"]');
-  if (link) {
-    ev.preventDefault();
-    knowledgeLocator.value = parseKnowledgeCitation(link.getAttribute("href") || "");
-    return;
-  }
   const btn = (ev.target as HTMLElement).closest(".copy-btn") as HTMLButtonElement | null;
   if (!btn) return;
   const raw = btn.dataset.copy;

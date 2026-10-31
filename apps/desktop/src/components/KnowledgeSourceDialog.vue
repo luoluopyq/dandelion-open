@@ -3,8 +3,8 @@
     <p v-if="loading" role="status">正在读取引用的原文版本…</p>
     <p v-else-if="error" class="corpus-error" role="alert">{{ error }}</p>
     <template v-else-if="article">
-      <div class="source-meta"><strong>{{ locator && 'page' in locator ? locator.page : '知识文章' }}</strong><span>当前文章版本</span></div>
-      <div class="source-article" v-html="articleHtml"></div>
+      <div class="source-meta"><strong>{{ currentLocator && 'page' in currentLocator ? currentLocator.page : '知识文章' }}</strong><span>当前文章版本</span></div>
+      <div class="source-article" v-html="articleHtml" @click="onArticleClick" @auxclick="onArticleClick"></div>
       <p class="source-note">此处展示知识文章的当前版本。核对具体事实时，请继续查看文章标明的原始资料出处。</p>
     </template>
     <template v-else-if="source">
@@ -18,19 +18,31 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { NModal } from "naive-ui";
-import { spaceChunkSource, spaceShow } from "../lib/ipc";
+import { spaceChunkSource, spaceShow, wikiShow } from "../lib/ipc";
 import { renderMarkdown } from "../lib/markdown";
 import type { KnowledgeChunkHit } from "../lib/types";
-import type { KnowledgeLocator } from "../lib/knowledge-citations";
-const props = defineProps<{ locator: KnowledgeLocator | null }>();
+import type { SourceLocator } from "../lib/knowledge-citations";
+import { relativeWikiPage } from "../lib/links";
+const props = defineProps<{ locator: SourceLocator | null }>();
 const emit = defineEmits<{ close: [] }>();
 const source = ref<KnowledgeChunkHit | null>(null), loading = ref(false), error = ref("");
 const article = ref("");
+const currentLocator = ref<SourceLocator | null>(null);
+function onArticleClick(event: MouseEvent) {
+  if (event.type === "auxclick" && event.button !== 1) return;
+  const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
+  const page = link && relativeWikiPage(link.getAttribute("href") ?? "");
+  const locator = currentLocator.value;
+  if (!page || !locator || !("page" in locator)) return;
+  event.preventDefault();
+  void load("workspace" in locator ? { workspace: locator.workspace, page } : { spaceId: locator.spaceId, page });
+}
 const articleHtml = computed(() => renderMarkdown(article.value));
 let generation = 0;
 const fileName = (path: string) => path.replace(/\\/g, "/").split("/").pop() || path;
-watch(() => props.locator, async locator => {
+async function load(locator: SourceLocator | null) {
   const current = ++generation;
+  currentLocator.value = locator;
   source.value = null; article.value = ""; error.value = ""; loading.value = !!locator;
   if (!locator) return;
   try {
@@ -38,7 +50,9 @@ watch(() => props.locator, async locator => {
       const result = await spaceChunkSource("local-user", locator.spaceId, locator.chunkId);
       if (current === generation) source.value = result;
     } else {
-      const pages = await spaceShow("local-user", locator.spaceId, locator.page);
+      const pages = "workspace" in locator
+        ? await wikiShow(locator.page, locator.workspace)
+        : await spaceShow("local-user", locator.spaceId, locator.page);
       if (current === generation) {
         article.value = pages[0]?.body || "";
         if (!article.value) error.value = "文章不存在或已被移除。";
@@ -47,7 +61,8 @@ watch(() => props.locator, async locator => {
   }
   catch (err) { if (current === generation) error.value = String(err); }
   finally { if (current === generation) loading.value = false; }
-}, { immediate: true });
+}
+watch(() => props.locator, locator => { void load(locator); }, { immediate: true });
 </script>
 <style scoped>
 .source-meta { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12px; }

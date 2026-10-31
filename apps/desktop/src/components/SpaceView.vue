@@ -49,7 +49,7 @@
           <p v-if="reader.loading" class="hub-help">加载中…</p>
           <p v-else-if="!reader.body" class="hub-help">这一页读不出来，可能是发布状态已变化。点左上角文章名重试，或换个页面。</p>
           <!-- 正文是 core 落盘的文章；renderMarkdown 经 DOMPurify 消毒。 -->
-          <div v-else class="reader-markdown" v-html="readerHtml" @click="onReaderClick"></div>
+          <div v-else class="reader-markdown" v-html="readerHtml" @click="onReaderClick" @auxclick="onReaderClick"></div>
         </article>
       </div>
       <div v-else class="space-empty">
@@ -215,6 +215,7 @@ import { createSpaceGate, runSpaceRead, spaceTargetKey } from "../lib/space-gate
 import { groupPages, resolveSelectedPage } from "../lib/wiki-view";
 import { citationTarget, linkifyCitations } from "../lib/wiki-evidence";
 import { renderMarkdown } from "../lib/markdown";
+import { relativeWikiPage } from "../lib/links";
 
 // 资料与文章为主导航，管理操作使用空间原有权限闸门。
 const SUBJECT = "local-user";
@@ -263,6 +264,13 @@ const cite = reactive<{ open: boolean; busy: boolean; token: string; error: stri
 const readerHtml = computed(() => linkifyCitations(renderMarkdown(reader.body), "查看来源版本"));
 
 function onReaderClick(event: MouseEvent) {
+  if (event.type === "auxclick" && event.button !== 1) return;
+  const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
+  if (link) {
+    const page = relativeWikiPage(link.getAttribute("href") ?? "");
+    if (page) { event.preventDefault(); openPage(page); }
+    return;
+  }
   const button = (event.target as HTMLElement).closest(".wiki-cite") as HTMLElement | null;
   if (!button) return;
   const target = citationTarget(button.dataset);

@@ -1183,6 +1183,7 @@ export function projectMemoryMetrics(): Promise<{ total: number; degraded: numbe
 // 地址白名单），下载在系统浏览器中完成。force=true 跳过后端 15 分钟缓存。
 export const checkUpdate=(force=false)=>invoke<import('./types').UpdateInfo>('check_update',force?{force:true}:{});
 export const openDownload=()=>invoke<void>('open_download');
+export const openExternalUrl = (url: string) => invoke<void>("open_external_url", { url });
 
 export function wikiSuggestProjectName(draftId:string):Promise<string>{return invoke("wiki_suggest_project_name",{draftId});}
 

@@ -124,19 +124,29 @@ pub fn open_download(updates: tauri::State<'_, Updates>) -> Result<(), String> {
     open_in_browser(&url)
 }
 
-/// 拒绝任何可被 shell 解释拼接的字符：地址本源自白名单校验，这是纵深防御。
+/// Content links open in the OS browser, never inside the application's webview.
+#[tauri::command]
+pub fn open_external_url(url: String) -> Result<(), String> {
+    open_in_browser(&url)
+}
+
 fn url_is_safe(url: &str) -> bool {
-    !url.contains(['"', '&', '|', '^', '<', '>', '\n', '\r'])
+    !url.chars().any(char::is_control)
+        && !url.contains(['"', '|', '^', '<', '>'])
+        && tauri::Url::parse(url).is_ok_and(|url| {
+            matches!(url.scheme(), "http" | "https" | "mailto")
+        })
 }
 
 fn open_in_browser(url: &str) -> Result<(), String> {
     if !url_is_safe(url) {
-        return Err("下载地址不合法".into());
+        return Err("链接地址不合法，仅支持网页和邮件链接".into());
     }
     #[cfg(windows)]
     let mut command = {
-        let mut command = std::process::Command::new("cmd");
-        command.args(["/C", "start", "", url]);
+        // Pass the URL directly to the OS handler, without cmd interpreting query parameters.
+        let mut command = std::process::Command::new("rundll32.exe");
+        command.args(["url.dll,FileProtocolHandler", url]);
         command
     };
     #[cfg(target_os = "macos")]
@@ -177,5 +187,14 @@ mod tests {
         assert!(!url_is_safe("https://example.com/a|b"));
         // 含元字符的地址在 spawn 之前就被拒绝，测试不会真的打开浏览器。
         assert!(open_in_browser("https://example.com/\"&calc").is_err());
+    }
+
+    #[test]
+    fn content_links_allow_web_queries_but_never_files_or_scripts() {
+        assert!(url_is_safe("https://example.com/article?q=rust&lang=zh#intro"));
+        assert!(url_is_safe("mailto:reader@example.com"));
+        for url in ["file:///tmp/article.md", "javascript:alert(1)", "data:text/html,hello", "../article.md", "https://example.com/\n"] {
+            assert!(!url_is_safe(url), "{url}");
+        }
     }
 }
